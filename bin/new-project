@@ -1,0 +1,79 @@
+#!/bin/zsh
+# new-project <name> [--public] [--dry-run] [--scaffold-only DIR] [--no-rc] [--ci]
+# Creates a governed GitHub repo, scaffolds the agent setup, clones it on the HP and
+# starts Remote Control there. Run on the Mac as the owner (ghbrando).
+#   --dry-run          print every step, change nothing
+#   --scaffold-only D  only write the starter files into directory D (local test)
+#   --no-rc            skip starting Remote Control on the HP
+#   --ci               GitHub-only steps (repo, rules, board, bot access); used by the ops Action
+set -e
+OWNER=ghbrando BOT=brandondevbot HP_DIR='%USERPROFILE%\life\projects'
+SKILL=${NP_SKILL:-~/.claude/skills/project-setup} TPL=$SKILL/templates
+name="" vis=--private dry=0 scaffold="" rc=1 ci=0
+while (( $# )); do
+  case $1 in
+    --public) vis=--public ;;
+    --dry-run) dry=1 ;;
+    --scaffold-only) scaffold=$2; shift ;;
+    --no-rc) rc=0 ;;
+    --ci) ci=1 rc=0 ;;
+    --name) name=$2; shift ;;
+    -*) echo "unknown flag $1" >&2; exit 1 ;;
+    *) name=$1 ;;
+  esac
+  shift
+done
+[[ -n $name || -n $scaffold ]] || { echo "usage: new-project <name> [--public] [--dry-run] [--no-rc]" >&2; exit 1; }
+[[ $name =~ ^[a-z0-9][a-z0-9-]*$ || -z $name ]] || { echo "name: lowercase letters, digits, dashes" >&2; exit 1; }
+run() { if (( dry )); then print -r -- "  would run: $*"; else eval "$@"; fi; }
+step() { print -r -- "• $*"; }
+
+scaffold_into() {  # write starter files into $1
+  local d=$1
+  mkdir -p $d/.claude/hooks $d/docs/changelog/assets $d/docs/current_feature_plans
+  sed "s/<Project name>/${name:-New project}/" $TPL/CLAUDE.md > $d/CLAUDE.md
+  cp $TPL/repo-claude/settings.json $d/.claude/settings.json
+  cp $TPL/repo-claude/hooks/guard.mjs $d/.claude/hooks/guard.mjs
+  cp $TPL/changelog-README.md $d/docs/changelog/README.md
+  cp $TPL/changelog-entry.md $d/docs/changelog/_TEMPLATE.md
+  sed "s/<Project>/${name:-this project}/" $TPL/CHANGELOG.md > $d/CHANGELOG.md
+  touch $d/docs/current_feature_plans/.gitkeep $d/docs/changelog/assets/.gitkeep
+  printf '# %s\n\nRun `/project-setup` in Claude Code to plan this project.\n' "${name:-New project}" > $d/README.md
+  printf '.env\n.env.*\n!.env.example\nnode_modules/\n.DS_Store\n._*\n.claude/settings.local.json\n' > $d/.gitignore
+}
+
+if [[ -n $scaffold ]]; then
+  step "Scaffolding into $scaffold"; scaffold_into $scaffold; find $scaffold -type f | sort; exit 0
+fi
+
+repo=$OWNER/$name
+(( dry )) && echo "DRY RUN for $repo — nothing will change"
+gh repo view $repo >/dev/null 2>&1 && { echo "$repo already exists" >&2; exit 1; }
+
+step "1. Create $repo ($vis) with starter files"
+tmp=$(mktemp -d)
+scaffold_into $tmp/$name
+run "git -C $tmp/$name init -q -b main && git -C $tmp/$name add -A && git -C $tmp/$name commit -q -m 'Project scaffold: agent setup, guardrails, changelog'"
+run "gh repo create $repo $vis --source $tmp/$name --push >/dev/null"
+
+step "2. Branch rules (dev, staging, rulesets) and Project board"
+run "$SKILL/github/governance.sh $repo"
+run "$SKILL/github/project.sh $OWNER $repo '$name' 'Foundation,Build,Launch' >/dev/null"
+
+step "3. Give $BOT write access (repo + board) and accept the invite on the HP"
+run "gh api -X PUT repos/$repo/collaborators/$BOT -f permission=push >/dev/null"
+(( ci )) || run "ssh hp 'C:\\Users\\brandondev\\.local\\gh\\bin\\gh.exe api user/repository_invitations --jq \".[] | select(.repository.full_name==\\\"$repo\\\") | .id\" > %TEMP%\\inv.txt & for /f %i in (%TEMP%\\inv.txt) do C:\\Users\\brandondev\\.local\\gh\\bin\\gh.exe api -X PATCH user/repository_invitations/%i' 2>&1 | { grep -v '^\*\*' || true; }"
+run "pid=\$(gh project list --owner $OWNER --format json --jq '.projects[] | select(.title==\"$name\") | .id'); bid=\$(gh api users/$BOT --jq .node_id); gh api graphql -f query='mutation(\$p:ID!,\$u:ID!){updateProjectV2Collaborators(input:{projectId:\$p,collaborators:[{userId:\$u,role:WRITER}]}){clientMutationId}}' -f p=\$pid -f u=\$bid >/dev/null"
+
+if (( ci )); then rm -rf $tmp; echo "Done: https://github.com/$repo"; exit 0; fi
+step "4. Clone on the HP into life\\projects\\$name (on dev)"
+run "ssh hp 'cd /d $HP_DIR && git clone -q -b dev https://github.com/$repo.git $name' 2>&1 | { grep -v '^\*\*' || true; }"
+rm -rf $tmp
+
+if (( rc )); then
+  step "5. Start Remote Control on the HP for $name (answer y to trust the folder; Ctrl-C to stop)"
+  run "ssh -t hp 'cd /d $HP_DIR\\$name && claude remote-control --name $name --spawn worktree'"
+else
+  step "5. Skipped Remote Control (--no-rc)"
+fi
+echo "Done: https://github.com/$repo · open '$name' in the Claude app and run /project-setup"

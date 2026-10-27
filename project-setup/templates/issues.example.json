@@ -1,0 +1,82 @@
+{
+  "plan": "docs/IMPLEMENTATION_PLAN.md",
+  "sdd": "docs/<design-doc>",
+  "issues": [
+    {
+      "key": "I-01",
+      "title": "Foundation: scaffold, Supabase clients, schema with RLS, routing skeleton",
+      "phase": "0 Foundation",
+      "area": "Infra",
+      "priority": "P0",
+      "sequence": 1,
+      "done": true,
+      "labels": [
+        "type:infra"
+      ],
+      "context": "Every feature builds on one shared contract: the Next.js app, Supabase helpers, the database schema with Row-Level Security, shared types and the routes for screens 1-14.",
+      "trace": "RC-01, RC-02, RC-03, RC-07, DD-06; SDD 5.1-5.3; screens 1-14",
+      "acceptance": [
+        "`npm run typecheck` and `npm run build` pass",
+        "RLS is enabled on every table in `supabase/migrations/0001_init.sql`",
+        "`/@handle` rewrites to `/u/[handle]`",
+        "No server secret is referenced from client code"
+      ],
+      "design": [
+        "SDD 5.3 Core Data Model",
+        "SDD Figure 2 screen flow"
+      ],
+      "dependencies": [
+        "None"
+      ],
+      "verification": [
+        "`npm run typecheck && npm run build`",
+        "Read the migration for `enable row level security` on all six tables"
+      ],
+      "out_of_scope": [
+        "Feature behavior (later phases)"
+      ],
+      "evidence": [
+        "34e3e46 Phase 0 scaffold, Supabase clients, schema+RLS, shared types, route skeleton"
+      ]
+    },
+    {
+      "key": "I-10",
+      "title": "Dashboard (screen 4): testimony status and continue actions",
+      "phase": "6 MVP Completion",
+      "area": "Frontend",
+      "priority": "P1",
+      "sequence": 10,
+      "done": false,
+      "labels": [
+        "type:feature"
+      ],
+      "context": "A returning author lands on the dashboard, which is still a placeholder. It should show where their testimony stands and take them to the next step in one tap.",
+      "trace": "Screen 4 Dashboard; SDD 6.1 returning-author path; US-01 (returning user reaches dashboard)",
+      "acceptance": [
+        "Replaces `PageStub` in `app/(app)/dashboard/page.tsx`",
+        "Shows testimony status in plain words: not started, draft in progress, published (public or unlisted), unpublished",
+        "Primary action matches status: start or continue with the coach, keep editing, view my page, share",
+        "Shows the permanent testimony link when published",
+        "Signed-out visitors are redirected to sign-in (RC-01)",
+        "Mobile-first, keyboard accessible, WCAG AA contrast (RC-11)",
+        "No implementation terms in the UI (e.g. no 'draft_content', 'status')"
+      ],
+      "design": [
+        "SDD Figure 2 screen 4 (status, continue)",
+        "SDD 6.1 author flow"
+      ],
+      "dependencies": [
+        "I-02, I-04, I-07 (done)"
+      ],
+      "verification": [
+        "`npm run typecheck && npm run lint && npm run build && npm test`",
+        "Screenshot of the dashboard in each status on a phone-width viewport",
+        "UX and domain-language review of all copy"
+      ],
+      "out_of_scope": [
+        "Analytics, multiple testimonies, social features"
+      ]
+    }
+  ],
+  "_note": "Example from RebirthAI. 'done': true closes the Issue at Done in Dev with 'evidence'. phase/area/priority must match Project field options."
+}

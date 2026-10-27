@@ -1,0 +1,27 @@
+name: Feature
+description: One executable unit for an agent feature cycle
+labels: [feature]
+body:
+  - type: textarea
+    id: outcome
+    attributes: {label: Outcome / Why, description: What capability should exist and why it matters}
+    validations: {required: true}
+  - type: textarea
+    id: acceptance
+    attributes: {label: Acceptance criteria, description: Observable conditions that define done, in domain language}
+    validations: {required: true}
+  - type: textarea
+    id: scope
+    attributes: {label: Scope / non-goals}
+  - type: textarea
+    id: dependencies
+    attributes: {label: Dependencies, description: True blockers and parent/sub-issue links, separate from preferred sequence}
+  - type: textarea
+    id: domain-ux
+    attributes: {label: Domain / UX notes, description: Rules, vocabulary, mockups, user-flow constraints}
+  - type: textarea
+    id: risk
+    attributes: {label: Risk / review triggers, description: Security, database/Firebase rules, architecture, privacy or migration concerns}
+  - type: textarea
+    id: evidence
+    attributes: {label: Completion evidence, description: Filled at completion - PR link, verification summary, screenshots, dev status}

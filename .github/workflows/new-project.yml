@@ -1,0 +1,36 @@
+name: New project
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: Project name (lowercase letters, digits, dashes)
+        required: true
+      visibility:
+        description: Repo visibility
+        type: choice
+        options: [private, public]
+        default: private
+permissions:
+  contents: read
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    environment: owner   # waits for the owner's approval before the token is released
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y -qq zsh >/dev/null
+      - name: Create governed repo, rules, board, bot access
+        env:
+          GH_TOKEN: ${{ secrets.OWNER_TOKEN }}
+          NAME: ${{ inputs.name }}
+          VIS: ${{ inputs.visibility }}
+          NP_SKILL: ${{ github.workspace }}/project-setup
+        run: |
+          [[ "$NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "bad name"; exit 1; }
+          git config --global user.name ghbrando
+          git config --global user.email ghbrando@users.noreply.github.com
+          git config --global init.defaultBranch main
+          flag=""; [[ "$VIS" == public ]] && flag=--public
+          chmod +x bin/new-project project-setup/github/*.sh
+          bin/new-project "$NAME" $flag --ci
+          echo "### Created https://github.com/ghbrando/$NAME" >> "$GITHUB_STEP_SUMMARY"
